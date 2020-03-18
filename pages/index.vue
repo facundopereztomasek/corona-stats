@@ -274,12 +274,16 @@ export default {
     // }
   },
   mounted () {
-    this.$axios.$get('https://pomber.github.io/covid19/timeseries.json').then((data) => {
-      this.data = data
-      this.selectWorld()
-    })
+    this.updateData(this.selectWorld)
+    setInterval(this.updateData, 1000 * 3)
   },
   methods: {
+    updateData (cb) {
+      this.$axios.$get('https://pomber.github.io/covid19/timeseries.json').then((data) => {
+        this.data = data
+        cb && cb()
+      })
+    },
     selectWorld () {
       this.selectedCountries = (this.selectedCountries.length === this.countries.length ? [] : [...this.countries])
       this.selectCountry()
@@ -392,16 +396,16 @@ export default {
       this.relationChart.series = [
         {
           data: this.stats.map((stat) => {
-            return stat.recovered.amount ? stat.recovered.amount / stat.confirmed.amount * 100 : 0
+            return stat.recovered.amount ? Math.round(stat.recovered.amount / stat.confirmed.amount * 1000) / 10 : 0
           }),
-          name: 'Recuperación',
+          name: '% Recuperación',
           color: '#00ac69'
         },
         {
           data: this.stats.map((stat) => {
-            return stat.deaths.amount ? stat.deaths.amount / stat.confirmed.amount * 100 : 0
+            return stat.deaths.amount ? Math.round(stat.deaths.amount / stat.confirmed.amount * 1000) / 10 : 0
           }),
-          name: 'Mortalidad',
+          name: '% Mortalidad',
           color: '#e81500'
         }
       ]
