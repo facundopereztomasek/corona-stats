@@ -1,24 +1,21 @@
 <template>
   <div v-if="data" class="container">
     <ul class="countries">
-      <li :class="['country', {selected: countries.length === selected.length}]" @click="selectWorld">
+      <li :class="['country', {selected: countries.length === selectedCountries.length}]" @click="selectWorld">
         Mundo
-      </li><li v-for="country in countries" :key="country" :class="['country', {selected: selected.includes(country)}]" @click="selectCountry(country)">
+      </li><li v-for="country in countries" :key="country" :class="['country', {selected: selectedCountries.includes(country)}]" @click="selectCountry(country)">
         {{ country }}
       </li>
     </ul>
     <section>
       <div>
-        Zona: {{ selected.length === countries.length ? 'Mundo' : selected.join(', ') }}
+        <!-- Confirmados: {{ confirmed }} -->
       </div>
       <div>
-        Confirmados: {{ confirmed }}
+        <!-- Muertes: {{ deaths }} -->
       </div>
       <div>
-        Muertes: {{ deaths }}
-      </div>
-      <div>
-        Recuperados: {{ recovered }}
+        <!-- Recuperados: {{ recovered }} -->
       </div>
       <div class="charts">
         <div class="chart">
@@ -34,7 +31,7 @@
 
       <div class="charts">
         <div class="chart">
-          <highcharts :options="statsVelocityChart" />
+          <highcharts :options="statsSpeedChart" />
         </div>
       </div>
 
@@ -43,6 +40,17 @@
           <highcharts :options="compareChart" />
         </div>
       </div>
+
+      <div class="charts">
+        <div class="chart">
+          <highcharts :options="relationChart" />
+        </div>
+      </div>
+      <pre>
+        {{ stats }}
+        <!-- {{ dates }} -->
+        <!-- {{ timestamps }} -->
+      </pre>
     </section>
   </div>
 </template>
@@ -57,7 +65,7 @@ export default {
   data () {
     return {
       data: null,
-      selected: [],
+      selectedCountries: [],
       confirmedChart: {
         chart: {
           type: 'spline',
@@ -97,7 +105,7 @@ export default {
           data: null
         }]
       },
-      statsVelocityChart: {
+      statsSpeedChart: {
         chart: {
           type: 'spline',
           backgroundColor: '#FAFAFA'
@@ -117,7 +125,20 @@ export default {
 
         },
         title: {
-          text: 'Velocidades'
+          text: 'Casos'
+        },
+        series: [{
+          data: null
+        }]
+      },
+      relationChart: {
+        chart: {
+          type: 'spline',
+          backgroundColor: '#FAFAFA'
+
+        },
+        title: {
+          text: 'Relaciones'
         },
         series: [{
           data: null
@@ -129,31 +150,128 @@ export default {
     countries () {
       return Object.keys(this.data).sort()
     },
-    zone () {
-      const countries = Object.keys(this.data)
-        .map(name => ({ name, data: this.data[name] }))
-        .filter(country => this.selected.includes(country.name))
+    timestamps () {
+      const timestamps = this.countries
+        .map(country => this.data[country].map(data => (new Date(data.date)).getTime()))
+        .reduce((last, current) => [...last, ...current], [])
+        .sort()
+      return [...new Set(timestamps)]
+    },
+    dates () {
+      return this.timestamps.reduce((last, current) => {
+        const date = new Date(current)
+        const y = date.getFullYear()
+        const m = date.getMonth() + 1
+        const d = date.getDate()
+        last[current] = {
+          date: `${y}-${m}-${d}`,
+          confirmed: {
+            amount: 0,
+            speed: 0
+          }
+        }
+        return last
+      }, {})
+    },
+    stats () {
+      const dates = Object.keys(this.dates).map((_date, index, arr) => {
+        const date = this.dates[_date]
+        const lastDate = this.dates[arr[index - 1]]
 
-      return countries
-    },
-    zoneByDate () {
-      return this.countriesByDate(this.zone)
-    },
-    confirmed () {
-      return this.lastData && this.lastData.confirmed
-    },
-    deaths () {
-      return this.lastData && this.lastData.deaths
-    },
-    recovered () {
-      return this.lastData && this.lastData.recovered
-    },
-    lastData () {
-      const datesList = Object.keys(this.zoneByDate.stats)
-      const lastDate = datesList[datesList.length - 1]
+        const countries = this.countries.filter(country => this.selectedCountries.includes(country))
 
-      return this.zoneByDate.stats[lastDate]
+        const amounts = countries
+          .map((country) => {
+            return this.data[country]
+              .find(data => data.date === date.date)
+          })
+          .reduce((last, current) => {
+            return {
+              confirmed: last.confirmed + current.confirmed,
+              deaths: last.deaths + current.deaths,
+              recovered: last.recovered + current.recovered
+            }
+          }, { confirmed: 0, deaths: 0, recovered: 0 })
+
+        const lastAmounts = lastDate ? countries
+          .map((country) => {
+            return this.data[country]
+              .find(data => data.date === lastDate.date)
+          })
+          .reduce((last, current) => {
+            return {
+              confirmed: last.confirmed + current.confirmed,
+              deaths: last.deaths + current.deaths,
+              recovered: last.recovered + current.recovered
+            }
+          }, { confirmed: 0, deaths: 0, recovered: 0 }) : { confirmed: 0, deaths: 0, recovered: 0 }
+
+        const speeds = {
+          confirmed: amounts.confirmed - lastAmounts.confirmed,
+          deaths: amounts.deaths - lastAmounts.deaths,
+          recovered: amounts.recovered - lastAmounts.recovered
+        }
+
+        return {
+          date: date.date,
+          confirmed: {
+            amount: amounts.confirmed,
+            speed: speeds.confirmed
+          },
+          deaths: {
+            amount: amounts.deaths,
+            speed: speeds.deaths
+          },
+          recovered: {
+            amount: amounts.recovered,
+            speed: speeds.recovered
+          }
+        }
+      })
+      return dates
     }
+
+    // "1581562800000": {
+    //   "date": "2020-2-13",
+    //   "confirmed": {
+    //     "amount": 0,
+    //     "speed": 0
+    //   }
+    // },
+
+    // Thailand: [
+    //   { date: "2020-1-22", confirmed: 2, deaths: 0, recovered: 0 },
+    //   { date: "2020-1-23", confirmed: 3, deaths: 0, recovered: 0 },
+    // ],
+    // Thailand: [
+    //   { date: "2020-1-22", confirmed: 2, deaths: 0, recovered: 0 },
+    //   { date: "2020-1-23", confirmed: 3, deaths: 0, recovered: 0 },
+    // ]
+    // zone () {
+    //   const countries = Object.keys(this.data)
+    //     .map(name => ({ name, data: this.data[name] }))
+    //     .filter(country => this.selected.includes(country.name))
+
+    //   return countries
+    // },
+    // zoneByDate () {
+    //   return this.countriesByDate(this.zone)
+    // },
+    // confirmed () {
+    //   return this.lastData && this.lastData.confirmed
+    // },
+    // deaths () {
+    //   return this.lastData && this.lastData.deaths
+    // },
+    // recovered () {
+    //   return this.lastData && this.lastData.recovered
+    // },
+    // lastData () {
+    //   const datesList = this.stats
+    //   stat lastDate = datesList[datesList.length - 1]
+
+    //   stat.confirmed.amount]
+    // }
   },
   mounted () {
     this.$axios.$get('https://pomber.github.io/covid19/timeseries.json').then((data) => {
@@ -163,129 +281,158 @@ export default {
   },
   methods: {
     selectWorld () {
-      this.selected = (this.selected.length === this.countries.length ? [] : [...this.countries])
+      this.selectedCountries = (this.selectedCountries.length === this.countries.length ? [] : [...this.countries])
       this.selectCountry()
     },
     selectCountry (zone) {
-      this.selected = this.selected.includes(zone)
-        ? [...this.selected.filter(name => name !== zone)]
-        : [...this.selected, zone]
+      this.selectedCountries = this.selectedCountries.includes(zone)
+        ? [...this.selectedCountries.filter(name => name !== zone)]
+        : [...this.selectedCountries, zone]
           .filter(_ => _ !== undefined)
 
       this.confirmedChart.series = [
         {
-          data: Object.keys(this.zoneByDate.stats).map((date) => {
-            return this.zoneByDate.stats[date].confirmed
+          data: this.stats.map((stat) => {
+            return stat.confirmed.amount
           }),
-          name: 'Confirmados'
+          name: 'Confirmados',
+          color: '#0061f2'
         },
         {
-          data: Object.keys(this.zoneByDate.stats).map((date) => {
-            return this.zoneByDate.stats[date].confirmedSpeed
+          data: this.stats.map((stat) => {
+            return stat.confirmed.speed
           }),
-          name: 'Velocidad de Confirmados'
+          name: 'Velocidad de Confirmados',
+          color: '#f4a100'
         }
       ]
 
       this.deathsChart.series = [
         {
-          data: Object.keys(this.zoneByDate.stats).map((date) => {
-            return this.zoneByDate.stats[date].deaths
+          data: this.stats.map((stat) => {
+            return stat.deaths.amount
           }),
-          name: 'Muertes'
+          name: 'Muertes',
+          color: '#e81500'
         },
         {
-          data: Object.keys(this.zoneByDate.stats).map((date) => {
-            return this.zoneByDate.stats[date].deathsSpeed
+          data: this.stats.map((stat) => {
+            return stat.deaths.speed
           }),
-          name: 'Velocidad de Muertes'
+          name: 'Velocidad de Muertes',
+          color: '#f4a100'
         }
       ]
 
       this.recoveredChart.series = [
         {
-          data: Object.keys(this.zoneByDate.stats).map((date) => {
-            return this.zoneByDate.stats[date].recovered
+          data: this.stats.map((stat) => {
+            return stat.recovered.amount
           }),
-          name: 'Recuperados'
+          name: 'Recuperados',
+          color: '#00ac69'
         },
         {
-          data: Object.keys(this.zoneByDate.stats).map((date) => {
-            return this.zoneByDate.stats[date].recoveredSpeed
+          data: this.stats.map((stat) => {
+            return stat.recovered.speed
           }),
-          name: 'Velocidad de Recuperados'
+          name: 'Velocidad de Recuperados',
+          color: '#f4a100'
         }
       ]
 
       this.compareChart.series = [
         {
-          data: Object.keys(this.zoneByDate.stats).map((date) => {
-            return this.zoneByDate.stats[date].confirmed
+          data: this.stats.map((stat) => {
+            return stat.confirmed.amount
           }),
-          name: 'Confirmados'
+          name: 'Confirmados',
+          color: '#0061f2'
         },
         {
-          data: Object.keys(this.zoneByDate.stats).map((date) => {
-            return this.zoneByDate.stats[date].deaths
+          data: this.stats.map((stat) => {
+            return stat.deaths.amount
           }),
-          name: 'Muertes'
+          name: 'Muertes',
+          color: '#e81500'
         },
         {
-          data: Object.keys(this.zoneByDate.stats).map((date) => {
-            return this.zoneByDate.stats[date].recovered
+          data: this.stats.map((stat) => {
+            return stat.recovered.amount
           }),
-          name: 'Recuperados'
+          name: 'Recuperados',
+          color: '#00ac69'
         }
       ]
 
-      this.statsVelocityChart.series = [
+      this.statsSpeedChart.series = [
         {
-          data: Object.keys(this.zoneByDate.stats).map((date) => {
-            return this.zoneByDate.stats[date].confirmedSpeed
+          data: this.stats.map((stat) => {
+            return stat.confirmed.speed
           }),
-          name: 'Confirmados'
+          name: 'Confirmados',
+          color: '#0061f2'
         },
         {
-          data: Object.keys(this.zoneByDate.stats).map((date) => {
-            return this.zoneByDate.stats[date].deathsSpeed
+          data: this.stats.map((stat) => {
+            return stat.deaths.speed
           }),
-          name: 'Muertes'
+          name: 'Muertes',
+          color: '#e81500'
         },
         {
-          data: Object.keys(this.zoneByDate.stats).map((date) => {
-            return this.zoneByDate.stats[date].recoveredSpeed
+          data: this.stats.map((stat) => {
+            return stat.recovered.speed
           }),
-          name: 'Recuperados'
+          name: 'Recuperados',
+          color: '#00ac69'
         }
       ]
-    },
-    countriesByDate (countries) {
-      const dates = {
-        countries: this.selected,
-        stats: {}
-      }
-      countries.forEach((country) => {
-        country.data.forEach((data, index, arr) => {
-          const date = dates.stats[data.date]
 
-          dates.stats[data.date] = {
-            confirmed: (date ? date.confirmed : 0) + data.confirmed,
-            deaths: (date ? date.deaths : 0) + data.deaths,
-            recovered: (date ? date.recovered : 0) + data.recovered
-          }
-        })
-      })
-
-      const datesList = Object.keys(dates.stats)
-
-      datesList.forEach((date, index, arr) => {
-        dates.stats[date].confirmedSpeed = dates.stats[date].confirmed - (arr[index - 1] ? dates.stats[arr[index - 1]].confirmed : 0)
-        dates.stats[date].deathsSpeed = dates.stats[date].deaths - (arr[index - 1] ? dates.stats[arr[index - 1]].deaths : 0)
-        dates.stats[date].recoveredSpeed = dates.stats[date].recovered - (arr[index - 1] ? dates.stats[arr[index - 1]].recovered : 0)
-      })
-
-      return dates
+      this.relationChart.series = [
+        {
+          data: this.stats.map((stat) => {
+            return stat.recovered.amount ? stat.recovered.amount / stat.confirmed.amount * 100 : 0
+          }),
+          name: 'Recuperación',
+          color: '#00ac69'
+        },
+        {
+          data: this.stats.map((stat) => {
+            return stat.deaths.amount ? stat.deaths.amount / stat.confirmed.amount * 100 : 0
+          }),
+          name: 'Mortalidad',
+          color: '#e81500'
+        }
+      ]
     }
+    // countriesByDate (countries) {
+    //   const dates = {
+    //     countries: this.selected,
+    //     stats: {}
+    //   }
+    //   countries.forEach((country) => {
+    //     country.data.forEach((data, index, arr) => {
+    //       const date = dates.stats[data.date]
+
+    //       dates.stats[data.date] = {
+    //         confirmed: (date ? date.confirmed : 0) + data.confirmed,
+    //         deaths: (date ? date.deaths : 0) + data.deaths,
+    //         recovered: (date ? date.recovered : 0) + data.recovered
+    //       }
+    //     })
+    //   })
+
+    //   const datesList = Object.keys(dates.stats)
+
+    //   datesList.forEach((date, index, arr) => {
+    //     dates.stats[date].confirmedSpeed = dates.stats[date].confirmed - (arr[index - 1] ? dates.stats[arr[index - 1]].confirmed : 0)
+    //     dates.stats[date].deathsSpeed = dates.stats[date].deaths - (arr[index - 1] ? dates.stats[arr[index - 1]].deaths : 0)
+    //     dates.stats[date].recoveredSpeed = dates.stats[date].recovered - (arr[index - 1] ? dates.stats[arr[index - 1]].recovered : 0)
+    //   })
+
+    //   return dates
+    // }
   }
 }
 </script>
