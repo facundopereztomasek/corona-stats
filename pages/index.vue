@@ -275,7 +275,7 @@ export default {
   },
   mounted () {
     this.updateData(this.selectWorld)
-    setInterval(this.updateData, 1000 * 3)
+    setInterval(this.updateData, 1000 * 60 * 5)
   },
   methods: {
     updateData (cb) {

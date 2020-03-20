@@ -65,11 +65,17 @@ export default {
   /*
   ** Build configuration
   */
+  router: {
+    base: process.env.NODE_ENV === 'production' ? '/corona-stats/' : '/',
+  },
+  /*
+  ** Build configuration
+  */
   build: {
     /*
     ** You can extend webpack config here
     */
-    extend (config, ctx) {
-    }
+    publicPath: process.env.NODE_ENV === 'production' ? '/' : '',
+    extend (config, ctx) {}
   }
 }
