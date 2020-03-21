@@ -53,6 +53,11 @@
       </pre>
     </section>
   </div>
+  <div v-else>
+    <span class="loading">
+      Cargando...
+    </span>
+  </div>
 </template>
 
 <script>
@@ -442,6 +447,12 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+.loading {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
 .container {
   box-sizing: border-box;
   .countries {
