@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@nuxtjs/axios": "^5.3.6",
-    "highcharts": "^8.0.4",
+    "highcharts": "^8.1.1",
     "highcharts-vue": "^1.3.5",
     "nuxt": "^2.0.0"
   },
